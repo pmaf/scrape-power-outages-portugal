@@ -1,0 +1,30 @@
+name: Create 'addresses.parquet'
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: create file
+      run: |-
+        tar -xf duckdb.tar.xz && ./duckdb -c "
+          INSTALL httpfs; LOAD httpfs;
+          COPY (
+            SELECT DISTINCT ON (geometry) postcode, ST_X(ST_ReducePrecision(geometry, 0.00001)) as x, ST_Y(ST_ReducePrecision(geometry, 0.00001)) as y
+            FROM read_parquet('s3://overturemaps-us-west-2/release/2024-09-18.0/theme=addresses/type=*/*', filename=true, hive_partitioning=1)
+            WHERE country = 'PT'
+          ) TO 'addresses.parquet' WITH (FORMAT PARQUET, COMPRESSION BROTLI)"
+        rm duckdb
+    - name: push
+      run: |-
+        git config user.name "Automated"
+        git config user.email "actions@users.noreply.github.com"
+        git add -A
+        git commit -m "Addresses file updated: $(date -u)" || exit 0
+        git pull --rebase && git push

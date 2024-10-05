@@ -1,0 +1,28 @@
+name: network-scheduling-work
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 8 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: scrape
+      run: |-
+        curl -s 'https://e-redes.opendatasoft.com/api/explore/v2.1/catalog/datasets/network-scheduling-work/exports/csv?delimiter=,&select=zipcode%2Cparishcode%2Cstartdatetime%2Cdurationallocation&order_by=zipcode' > network-scheduling-work.csv
+        tar -xf duckdb.tar.xz \
+        && ./duckdb -c "COPY (SELECT x,y FROM 'addresses.parquet' WHERE postcode IN (SELECT zipcode FROM 'network-scheduling-work.csv')) TO 'network-scheduling-points.csv'"
+        rm duckdb
+    - name: push
+      run: |-
+        git config user.name "Automated"
+        git config user.email "actions@users.noreply.github.com"
+        git add -A
+        git commit -m "$(date -u)" || exit 0
+        git pull --rebase && git push

@@ -1,0 +1,27 @@
+name: outages-per-geography
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '*/12 * * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: scrape
+      run: |-
+        curl -s 'https://e-redes.opendatasoft.com/api/explore/v2.1/catalog/datasets/outages-per-geography/exports/csv?delimiter=,&select=exclude(municipality)%2Cexclude(interrupcao_ativa)&where=zipcode%20is%20not%20null&order_by=zipcode' > outages-per-geography.csv
+        tar -xf duckdb.tar.xz \
+        && ./duckdb -c "COPY (SELECT x,y FROM 'addresses.parquet' WHERE postcode IN (SELECT zipcode FROM 'outages-per-geography.csv')) TO 'outages-points.csv'"
+        rm duckdb
+    - name: push
+      run: |-
+        git config user.name "Automated"
+        git config user.email "actions@users.noreply.github.com"
+        git add -A
+        git commit -m "$(date -u)" || exit 0
+        git pull --rebase && git push
