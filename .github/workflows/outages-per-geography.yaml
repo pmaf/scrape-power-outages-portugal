@@ -3,7 +3,7 @@ name: outages-per-geography
 on:
   workflow_dispatch:
   schedule:
-  - cron: '*/12 * * * *'
+  #- cron: '*/12 * * * *'
 
 permissions:
   contents: write
